@@ -1,4 +1,4 @@
-import { isIndexSegment, isPathUnder, parsePath } from './paths/operations';
+import { isIndexSegment, isPathUnder, parsePath } from './paths/operations.js';
 
 /**
  * Minimal write surface shared by the error stores so validation helpers can

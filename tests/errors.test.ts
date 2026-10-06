@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createForm } from '../src';
+import { createForm } from '../src/index.js';
 
 describe('errors', () => {
   const makeForm = () =>

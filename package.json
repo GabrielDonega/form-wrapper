@@ -1,5 +1,5 @@
 {
-  "name": "form-wrapper",
+  "name": "@donega/form-wrapper",
   "version": "0.1.0",
   "description": "Headless, framework-agnostic form state controller with typed nested paths",
   "type": "module",
@@ -12,21 +12,45 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build && npm run smoke"
   },
   "keywords": [
     "form",
     "headless",
     "form-state",
     "validation",
-    "typescript"
+    "typescript",
+    "framework-agnostic"
   ],
+  "author": {
+    "name": "Gabriel Donegá",
+    "url": "https://github.com/GabrielDonega"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GabrielDonega/form-wrapper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GabrielDonega/form-wrapper/issues"
+  },
+  "homepage": "https://github.com/GabrielDonega/form-wrapper#readme",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "devDependencies": {
     "typescript": "^5.6.3",

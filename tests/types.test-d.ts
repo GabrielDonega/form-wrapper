@@ -4,8 +4,8 @@
  * with @ts-expect-error so the suite fails if the safety regresses.
  */
 import { describe, expectTypeOf, it } from 'vitest';
-import { createForm } from '../src';
-import type { ArrayPath, Path, PathValue } from '../src';
+import { createForm } from '../src/index.js';
+import type { ArrayPath, Path, PathValue } from '../src/index.js';
 
 interface UserProfile {
   name: string;

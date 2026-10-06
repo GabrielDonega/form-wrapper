@@ -1,6 +1,6 @@
-import type { ArrayApi } from './array';
-import type { FieldApi } from './field';
-import type { ArrayPath, Path, PathValue, PathValueRaw, Primitive } from './paths/types';
+import type { ArrayApi } from './array.js';
+import type { FieldApi } from './field.js';
+import type { ArrayPath, Path, PathValue, PathValueRaw, Primitive } from './paths/types.js';
 
 export type { ArrayPath, Path, PathValue, Primitive };
 
@@ -127,6 +127,9 @@ export interface FormApi<TValues extends object, TData = void> {
     path: P,
   ): ArrayApi<ArrayItem<TValues, P>>;
 
-  /** Change notification for framework adapters; returns an unsubscribe fn. */
-  subscribe(listener: () => void): () => void;
+  /**
+   * Change notification for framework adapters; the form instance is passed
+   * to the listener and an unsubscribe function is returned.
+   */
+  subscribe(listener: (form: FormApi<TValues, TData>) => void): () => void;
 }

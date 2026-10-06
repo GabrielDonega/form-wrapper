@@ -1,4 +1,4 @@
-import { deepEqual } from './equality';
+import { deepEqual } from './equality.js';
 
 /**
  * Per-path controller returned by `form.field(path)`. Reads are getters, so

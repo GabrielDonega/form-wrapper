@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createForm } from '../src';
-import type { FieldApi } from '../src';
+import { createForm } from '../src/index.js';
+import type { FieldApi } from '../src/index.js';
 
 describe('field controller', () => {
   function setup() {

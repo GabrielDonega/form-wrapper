@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deepClone, deepEqual } from '../src/equality';
+import { deepClone, deepEqual } from '../src/equality.js';
 
 describe('deepEqual', () => {
   it('considers identical primitives and NaN equal', () => {

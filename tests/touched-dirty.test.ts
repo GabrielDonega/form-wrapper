@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createForm } from '../src';
+import { createForm } from '../src/index.js';
 
 describe('touched', () => {
   it('tracks touched per path and exposes the nested structure', () => {

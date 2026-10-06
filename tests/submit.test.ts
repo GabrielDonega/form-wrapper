@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createForm } from '../src';
+import { createForm } from '../src/index.js';
 
 describe('submit', () => {
   const validForm = (onSubmit: (values: unknown) => unknown) =>

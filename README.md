@@ -1,19 +1,21 @@
-# form-wrapper
+# @donega/form-wrapper
 
-Biblioteca **headless** de controle lógico de formulários: estado, valores, campos, validações, erros, dirty/touched, submissão e estruturas aninhadas — em TypeScript puro, sem dependência de Vue, React ou qualquer framework.
+A **headless** form state controller: values, fields, validation, errors, dirty/touched, submission and deeply nested structures — in pure TypeScript, with no dependency on Vue, React or any framework.
 
-> Não é uma biblioteca de UI. Não conhece inputs, selects, mensagens visuais ou CSS. A camada de apresentação (ou um adapter de framework) decide como renderizar.
+> This is not a UI library. It knows nothing about inputs, selects, visual messages or CSS. The presentation layer (or a framework adapter) decides how to render.
 
-## Instalação
+## Installation
 
 ```bash
-npm install form-wrapper
+npm install @donega/form-wrapper
 ```
 
-## Uso básico
+Requires Node >= 18 (any modern bundler works in the browser). Zero runtime dependencies, ESM only, tree-shakeable.
+
+## Basic usage
 
 ```ts
-import { createForm } from 'form-wrapper';
+import { createForm } from '@donega/form-wrapper';
 
 const form = createForm({
   initialValues: {
@@ -26,12 +28,12 @@ const form = createForm({
     validate: (values) => ({
       valid: values.user.profile.name !== '',
       errors: values.user.profile.name === ''
-        ? { user: { profile: { name: 'Nome obrigatório' } } }
+        ? { user: { profile: { name: 'Name is required' } } }
         : null,
     }),
   },
   onSubmit: async (values) => {
-    await api.save(values); // recebe a estrutura aninhada completa
+    await api.save(values); // receives the complete nested structure
   },
 });
 
@@ -42,51 +44,101 @@ await form.validateField('user.profile.name');
 await form.submit(); // { status: 'submitted' | 'invalid' | 'error' | 'skipped', ... }
 ```
 
-## API pública
+## Framework integration
 
-### Estado (getters)
+The core exposes a single integration hook: `subscribe(listener)`. Every mutation calls the listener synchronously and hands it the form instance; it returns an unsubscribe function. Combined with the reference-stable `form.state` snapshot, the same headless pattern works in any framework:
 
-| Propriedade | Descrição |
+### React — `useSyncExternalStore`
+
+```tsx
+import { useSyncExternalStore } from 'react';
+import { createForm, type FormApi } from '@donega/form-wrapper';
+
+export function useForm<TValues extends object, TData = void>(form: FormApi<TValues, TData>) {
+  const state = useSyncExternalStore(
+    form.subscribe,          // subscribe(listener) — signature matches
+    () => form.state,        // snapshot is reference-stable between changes
+  );
+  return { state, form };
+}
+```
+
+> `form.state` is cached and only rebuilt when the form changes — exactly what `useSyncExternalStore` requires. Passing a fresh object per access would cause an infinite render loop.
+
+### Vue — `ref` + `watchEffect`
+
+```ts
+import { ref, onUnmounted } from 'vue';
+import { createForm } from '@donega/form-wrapper';
+
+const form = createForm({ initialValues: { name: '' } });
+const state = ref(form.state);
+
+const unsubscribe = form.subscribe(() => {
+  state.value = form.state;
+});
+onUnmounted(unsubscribe);
+```
+
+### Svelte — writable store
+
+```ts
+import { writable } from 'svelte/store';
+import { createForm } from '@donega/form-wrapper';
+
+const form = createForm({ initialValues: { name: '' } });
+const state = writable(form.state);
+
+form.subscribe(() => state.set(form.state)); // Svelte auto-unsubscribes
+```
+
+Official adapters (`useForm` composable/hook per framework, validators) are planned — see [Roadmap](#roadmap).
+
+## Public API
+
+### State (getters)
+
+| Property | Description |
 |---|---|
-| `values` | Objeto aninhado atual (mutar só via API) |
-| `initialValues` | Clone defensivo dos valores iniciais (nunca mutado) |
-| `errors` | Erros aninhados espelhando a estrutura de `values` |
-| `touched` | Estrutura aninhada de touched |
-| `isDirty` | Algum valor difere de `initialValues` (comparação profunda) |
-| `isValid` | Sem erros (validação e externos) |
-| `isSubmitting` | `onSubmit` em execução |
-| `isValidating` | Alguma validação em andamento |
-| `isSubmitted` | Último submit completou com sucesso |
-| `submitCount` | Total de tentativas de submit |
-| `state` | Snapshot consistente de tudo acima |
+| `values` | Current nested object (mutate only via the API) |
+| `initialValues` | Defensive clone of the initial values (never mutated) |
+| `errors` | Nested errors mirroring the structure of `values` |
+| `touched` | Nested touched structure |
+| `isDirty` | Any value differs from `initialValues` (deep comparison) |
+| `isValid` | No errors (validation and external) |
+| `isSubmitting` | `onSubmit` running |
+| `isValidating` | Any validation in flight |
+| `isSubmitted` | Last submit completed successfully |
+| `submitCount` | Total submit attempts |
+| `state` | Consistent snapshot of everything above (reference-stable between changes) |
 
-### Métodos
+### Methods
 
-- **Valores**: `getValue(path)`, `setValue(path, value)`
-- **Erros**: `getError(path)`, `setError(path, msg)` (canal externo/servidor), `clearError(path)`, `clearErrors(path?)`, `setErrors(nested)` (aplica erros de API, substituindo os externos anteriores)
+- **Values**: `getValue(path)`, `setValue(path, value)`
+- **Errors**: `getError(path)`, `setError(path, msg)` (external/server channel), `clearError(path)`, `clearErrors(path?)`, `setErrors(nested)` (applies API errors, replacing previous external ones)
 - **Touched**: `touch(path)`
-- **Validação**: `validate()`, `validateField(path)`
-- **Submit**: `submit()` — valida antes de executar `onSubmit`; retorna resultado discriminado tipado; proteção contra submits concorrentes; `isSubmitting` sempre restaurado
-- **Reset**: `reset()`, `resetField(path)` (funciona para leaf, objeto ou array)
-- **Controllers**: `field(path)` (value, error, touched, dirty, valid, validating + métodos), `array(path)` (append, prepend, insert, remove, replace, move, clear — remapeando errors/touched automaticamente)
-- **Adapters**: `subscribe(listener)` — notificação de mudanças para integração com frameworks
+- **Validation**: `validate()`, `validateField(path)`
+- **Submit**: `submit()` — validates before running `onSubmit`; returns a typed discriminated result; guards against concurrent submits; `isSubmitting` is always restored
+- **Reset**: `reset()`, `resetField(path)` (works for leaf, object or array)
+- **Controllers**: `field(path)` (value, error, touched, dirty, valid, validating + methods), `array(path)` (append, prepend, insert, remove, replace, move, clear — remapping errors/touched automatically)
+- **Adapters**: `subscribe(listener)` — change notification for framework integration
 
-## Type safety de paths
+## Path type safety
 
-A partir de `initialValues`, os tipos `Path<T>`, `PathValue<T, P>` e `ArrayPath<T>` inferem os paths válidos e o tipo do valor em cada um:
+From `initialValues`, the `Path<T>`, `PathValue<T, P>` and `ArrayPath<T>` types infer valid paths and the value type at each one:
 
 ```ts
 form.setValue('user.profile.name', 'Gabriel'); // ok — string
 form.setValue('age', 30);                      // ok — number
-form.setValue('age', '30');                    // ✗ erro de tipo
-form.setValue('user.nope', 1);                 // ✗ path inexistente
+form.setValue('age', '30');                    // ✗ type error
+form.setValue('user.nope', 1);                 // ✗ nonexistent path
 form.array('users.0.tags');                    // ok — array
-form.array('user.profile');                    // ✗ não é array
+form.array('user.profile');                    // ✗ not an array
 ```
 
-## Validadores
+## Validators
 
-O core é agnóstico. Qualquer adapter implementa a interface:
+The core is agnostic. Any adapter implements the interface:
 
 ```ts
 interface FormValidator<TValues> {
@@ -95,58 +147,64 @@ interface FormValidator<TValues> {
 
 interface ValidationResult<TValues = unknown> {
   valid: boolean;
-  errors: FormErrors<TValues> | null; // estrutura aninhada espelhando values
+  errors: FormErrors<TValues> | null; // nested structure mirroring values
 }
 ```
 
-Adapters planejados: `validator-zod`, `validator-valibot`, etc. Um validator customizado (como acima) também funciona.
+Planned adapters: `validator-zod`, `validator-valibot`, etc. A custom validator (as above) works too.
 
-## Arquitetura
+## Architecture
 
 ```
-core (TypeScript puro, sem reatividade)
-  └── framework adapters (futuro: useForm do Vue/React via subscribe())
-        └── UI da aplicação
+core (pure TypeScript, no reactivity)
+  └── framework adapters (useForm for Vue/React via subscribe())
+        └── application UI
 ```
 
 ```
 src/
-  types.ts            tipos públicos (FormApi, FormValidator, SubmitOutcome…)
-  form.ts             createForm — orquestração
-  field.ts            FieldApi por path
-  array.ts            ArrayApi com remapeamento de índices
-  validation.ts       aplicação de resultados de validação
+  types.ts            public types (FormApi, FormValidator, SubmitOutcome…)
+  form.ts             createForm — orchestration
+  field.ts            FieldApi per path
+  array.ts            ArrayApi with index remapping
+  validation.ts       validation result application
   paths/types.ts      Path<T>, PathValue<T, P>, ArrayPath<T>
   paths/operations.ts getByPath, setByPath, deleteByPath, hasPath
-  pathMap.ts          store path-keyed (errors/touched) + remapIndices
+  pathMap.ts          path-keyed store (errors/touched) + remapIndices
   equality.ts         deepEqual, deepClone
 ```
 
-## Decisões de design
+## Design decisions
 
-- **Imutabilidade seletiva**: mutações criam novas raízes com compartilhamento estrutural; `initialValues` e itens de array são deep-clonados. A API é à prova de mutação externa.
-- **Dois canais de erro**: erros de validação (escritos apenas por `validate()`) e erros externos/servidor (`setError`/`setErrors`). `getError` mescla os dois (servidor tem precedência); `isValid` considera ambos.
-- **Versionamento de validação**: toda mutação de valores invalida validações em voo; resultados antigos nunca sobrescrevem os novos.
-- **`submit()` retornа, não lança**: `{ status: 'submitted' | 'invalid' | 'error' | 'skipped' }` — nenhum erro engolido silenciosamente.
+- **Selective immutability**: mutations create new roots with structural sharing; `initialValues` and array items are deep-cloned. The API is safe against external mutation.
+- **Two error channels**: validation errors (written only by `validate()`) and external/server errors (`setError`/`setErrors`). `getError` merges both (server takes precedence); `isValid` considers both.
+- **Validation versioning**: every value mutation invalidates in-flight validations; stale results never overwrite newer ones.
+- **`submit()` returns, doesn't throw**: `{ status: 'submitted' | 'invalid' | 'error' | 'skipped' }` — no error is silently swallowed.
+- **Reference-stable snapshots**: `state` is cached between mutations, so identity-based render systems (React's `useSyncExternalStore`) work out of the box.
 
-## Limitações conhecidas
+## Known limitations
 
-- Índices de array são tipados como `${number}`; por isso, strings numéricas como `'0.1'` também satisfazem o padrão (ex.: `'matrix.0.1'` é aceito mesmo sem que `0.1` seja um índice válido). Trade-off deliberado por simplicidade de tipos e autocomplete.
-- Índices de array em erros/touched geram arrays possivelmente esparsos na estrutura aninhada exposta (`users.0` e `users.2` com erro → buraco em `1`).
-- Não há validação automática em `setValue` (validateOnChange/Blur) — fica para o adapter de framework, que tem o contexto de UI.
+- Array indices are typed as `${number}`; numeric strings like `'0.1'` also match the pattern (e.g. `'matrix.0.1'` is accepted even if `0.1` isn't a valid index). A deliberate trade-off for type simplicity and autocomplete.
+- Array indices in errors/touched produce possibly sparse arrays in the exposed nested structure (`users.0` and `users.2` with errors → hole at `1`).
+- No automatic validation on `setValue` (validateOnChange/Blur) — left to the framework adapter, which has the UI context.
 
-## Desenvolvimento
+## Development
 
 ```bash
 npm install
-npm test          # vitest run (inclui typecheck dos testes de tipos)
+npm test          # vitest run (includes type-level test typecheck)
 npm run typecheck
 npm run build
+npm run smoke     # imports the built package in plain Node
 ```
 
-## Próximos passos sugeridos
+## Roadmap
 
-1. `@form-wrapper/validator-zod` (e demais adapters de validação)
-2. `@form-wrapper/vue` com `useForm()` reativo via `subscribe()`
-3. Opções de validação reativa (`validateOnBlur`, `validateOnChange`) no adapter
-4. Suporte a `Set`/`Map` e objetos de classe como valores
+1. `@donega/form-wrapper-validator-zod` (and other validation adapters)
+2. `@donega/form-wrapper-vue` / `-react` with reactive `useForm()` via `subscribe()`
+3. Reactive validation options (`validateOnBlur`, `validateOnChange`) in the adapters
+4. `Set`/`Map` and class instance support as values
+
+## License
+
+[MIT](./LICENSE) © Gabriel Donegá

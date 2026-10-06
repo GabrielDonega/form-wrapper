@@ -1,4 +1,4 @@
-export { createForm } from './form';
+export { createForm } from './form.js';
 
 export type {
   ArrayItem,
@@ -14,7 +14,7 @@ export type {
   Primitive,
   SubmitOutcome,
   ValidationResult,
-} from './types';
+} from './types.js';
 
-export type { FieldApi } from './field';
-export type { ArrayApi } from './array';
+export type { FieldApi } from './field.js';
+export type { ArrayApi } from './array.js';

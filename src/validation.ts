@@ -1,5 +1,5 @@
-import type { WritablePathStore } from './pathMap';
-import type { FormErrors } from './types';
+import type { WritablePathStore } from './pathMap.js';
+import type { FormErrors } from './types.js';
 
 /**
  * Flattens a nested error structure into path-keyed entries, e.g.

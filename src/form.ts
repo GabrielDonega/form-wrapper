@@ -1,10 +1,10 @@
-import { createArrayApi } from './array';
-import type { ArrayApi, ArrayContext } from './array';
-import { deepClone, deepEqual } from './equality';
-import { createFieldApi } from './field';
-import type { FieldApi, FieldContext } from './field';
-import { PathMap, buildNested } from './pathMap';
-import { getByPath, setByPath } from './paths/operations';
+import { createArrayApi } from './array.js';
+import type { ArrayApi, ArrayContext } from './array.js';
+import { deepClone, deepEqual } from './equality.js';
+import { createFieldApi } from './field.js';
+import type { FieldApi, FieldContext } from './field.js';
+import { PathMap, buildNested } from './pathMap.js';
+import { getByPath, setByPath } from './paths/operations.js';
 import type {
   ArrayItem,
   ArrayPath,
@@ -16,8 +16,8 @@ import type {
   Path,
   PathValue,
   SubmitOutcome,
-} from './types';
-import { applyValidationResult } from './validation';
+} from './types.js';
+import { applyValidationResult } from './validation.js';
 
 /**
  * Creates a headless form controller: pure state management, no framework
@@ -53,9 +53,29 @@ export function createForm<TValues extends object, TData = void>(
   // stale versions are discarded instead of applied.
   let validationVersion = 0;
 
-  const listeners = new Set<() => void>();
+  const listeners = new Set<(form: FormApi<TValues, TData>) => void>();
+  // Reference-stable snapshot of `state`, rebuilt lazily after each mutation.
+  // Adapters (e.g. React's useSyncExternalStore) compare snapshots by
+  // identity, so a fresh object per getter access would loop forever.
+  let stateCache: FormState<TValues> | null = null;
   function notify(): void {
-    for (const listener of listeners) listener();
+    stateCache = null;
+    for (const listener of listeners) listener(api);
+  }
+
+  function toState(): FormState<TValues> {
+    return (stateCache ??= {
+      values,
+      initialValues,
+      errors: toErrorsObject(),
+      touched: toTouchedObject(),
+      isDirty: isDirty(),
+      isValid: isValid(),
+      isSubmitting,
+      isValidating: formValidating || validatingFields.size > 0,
+      isSubmitted,
+      submitCount,
+    });
   }
 
   function getError(path: string): string | undefined {
@@ -257,10 +277,10 @@ export function createForm<TValues extends object, TData = void>(
       return values;
     },
     get errors(): FormErrors<TValues> {
-      return toErrorsObject();
+      return toState().errors;
     },
     get touched(): FormTouched<TValues> {
-      return toTouchedObject();
+      return toState().touched;
     },
     get isDirty(): boolean {
       return isDirty();
@@ -281,18 +301,7 @@ export function createForm<TValues extends object, TData = void>(
       return submitCount;
     },
     get state(): FormState<TValues> {
-      return {
-        values,
-        initialValues,
-        errors: toErrorsObject(),
-        touched: toTouchedObject(),
-        isDirty: isDirty(),
-        isValid: isValid(),
-        isSubmitting,
-        isValidating: formValidating || validatingFields.size > 0,
-        isSubmitted,
-        submitCount,
-      };
+      return toState();
     },
 
     getValue<P extends Path<TValues>>(path: P): PathValue<TValues, P> {
@@ -341,7 +350,7 @@ export function createForm<TValues extends object, TData = void>(
       return array;
     },
 
-    subscribe(listener: () => void): () => void {
+    subscribe(listener: (form: FormApi<TValues, TData>) => void): () => void {
       listeners.add(listener);
       return () => {
         listeners.delete(listener);

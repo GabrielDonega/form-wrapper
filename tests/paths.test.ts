@@ -7,7 +7,7 @@ import {
   isPathUnder,
   parsePath,
   setByPath,
-} from '../src/paths/operations';
+} from '../src/paths/operations.js';
 
 describe('parsePath', () => {
   it('splits dotted paths', () => {

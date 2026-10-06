@@ -1,4 +1,4 @@
-import { deepClone } from './equality';
+import { deepClone } from './equality.js';
 
 /**
  * Array operations bound to a path whose value is an array. `TItem` is the

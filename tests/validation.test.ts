@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createForm } from '../src';
-import type { FormValidator } from '../src';
+import { createForm } from '../src/index.js';
+import type { FormValidator } from '../src/index.js';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
