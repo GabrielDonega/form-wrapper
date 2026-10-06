@@ -1,0 +1,24 @@
+{
+  "name": "example-vue",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@donega/form-wrapper": "file:../..",
+    "@donega/form-wrapper-vue": "file:../../packages/vue",
+    "@donega/form-wrapper-zod": "file:../../packages/zod",
+    "vue": "^3.5.13",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0",
+    "vue-tsc": "^2.1.10"
+  }
+}

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@donega/form-wrapper — vanilla example</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 34rem; margin: 2rem auto; }
+      label { display: block; margin-bottom: 1rem; }
+      input { display: block; margin-top: 0.25rem; padding: 0.4rem; width: 100%; box-sizing: border-box; }
+      .error { color: #c0392b; font-size: 0.85rem; min-height: 1.2em; display: block; }
+      fieldset { margin-bottom: 1rem; }
+      pre { background: #f4f4f4; padding: 0.75rem; border-radius: 4px; overflow-x: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Sign up (vanilla)</h1>
+    <p>Headless form state, plain DOM bindings. No build step — serve this folder statically.</p>
+
+    <form id="signup">
+      <label>
+        Name
+        <input id="name" autocomplete="off" />
+        <span class="error" id="name-error"></span>
+      </label>
+
+      <fieldset>
+        <legend>Tags</legend>
+        <ul id="tags"></ul>
+        <button type="button" id="add-tag">add tag</button>
+      </fieldset>
+
+      <button type="submit" id="submit">Submit</button>
+      <button type="button" id="reset">Reset</button>
+    </form>
+
+    <pre id="state"></pre>
+
+    <!--
+      Imports the built core directly — run `npm run build` at the repo root
+      first, then serve statically FROM THE REPO ROOT, e.g.:
+        python3 -m http.server   # or: npx serve .
+      and open http://localhost:8000/examples/vanilla/
+    -->
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

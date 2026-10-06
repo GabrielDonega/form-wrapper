@@ -173,3 +173,30 @@ describe('validation', () => {
     expect(events.length).toBeGreaterThan(0);
   });
 });
+
+describe('stale field validation', () => {
+  it('discards a field validation whose values changed mid-flight', async () => {
+    const gates = [
+      deferred<{ valid: boolean; errors: { name: string } | null }>(),
+      deferred<{ valid: boolean; errors: { name: string } | null }>(),
+    ];
+    let call = 0;
+    const validator: FormValidator<{ name: string }> = {
+      validate: () => gates[call++]!.promise,
+    };
+    const form = createForm({ initialValues: { name: 'first' }, validator });
+
+    const first = form.validateField('name');
+    form.setValue('name', 'second'); // invalidates the in-flight run
+    const second = form.validateField('name');
+
+    gates[1]!.resolve({ valid: true, errors: null });
+    await second;
+    // the stale run must not apply its error to the path
+    gates[0]!.resolve({ valid: false, errors: { name: 'resultado velho' } });
+    await first;
+
+    expect(form.getError('name')).toBeUndefined();
+    expect(form.isValid).toBe(true);
+  });
+});

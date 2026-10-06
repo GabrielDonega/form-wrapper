@@ -1,209 +1,314 @@
 # @donega/form-wrapper
 
-A **headless** form state controller: values, fields, validation, errors, dirty/touched, submission and deeply nested structures — in pure TypeScript, with no dependency on Vue, React or any framework.
+**A headless form state controller for TypeScript.** It owns the hard part of forms — values, nested paths, dynamic arrays, validation, errors, dirty/touched tracking and submission — while your UI layer stays 100% yours.
 
-> This is not a UI library. It knows nothing about inputs, selects, visual messages or CSS. The presentation layer (or a framework adapter) decides how to render.
+It is for developers who want form logic that is **framework-agnostic** (Vue, React, Svelte or none), **type-safe down to every nested path**, and free of UI assumptions: no inputs, no styles, no components. Just state.
 
-## Installation
+[![npm version](https://img.shields.io/npm/v/@donega/form-wrapper.svg)](https://www.npmjs.com/package/@donega/form-wrapper)
+[![npm downloads](https://img.shields.io/npm/dm/@donega/form-wrapper.svg)](https://www.npmjs.com/package/@donega/form-wrapper)
+[![CI](https://github.com/GabrielDonega/form-wrapper/actions/workflows/ci.yml/badge.svg)](https://github.com/GabrielDonega/form-wrapper/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
+**Features:** framework-agnostic · TypeScript-first · type-safe nested paths · nested objects · dynamic arrays · sync & async validation · server errors · dirty/touched state · typed submission · zero UI assumptions · zero dependencies
+
+## Why?
+
+Without a form library, every form re-implements the same plumbing by hand:
+
+```
+values + errors + touched + dirty + loading + validation
+        + submission + server errors + nested fields + dynamic arrays
+```
+
+Each concern needs its own state, its own updates, and they all need to stay in sync — especially when arrays reorder or the API returns errors after submit. `form-wrapper` centralizes all of it in one controller, and leaves rendering to you:
+
+```ts
+const form = createForm({ initialValues: { name: '' } });
+
+form.setValue('name', 'Gabriel');   // state, dirty tracking, notifications
+form.field('name').error;           // error for that exact path
+form.array('tags').move(2, 0);      // arrays remap errors/touched for you
+await form.submit();                // validates, then calls your onSubmit
+```
+
+## Quick Start
 
 ```bash
 npm install @donega/form-wrapper
 ```
 
-Requires Node >= 18 (any modern bundler works in the browser). Zero runtime dependencies, ESM only, tree-shakeable.
-
-## Basic usage
-
 ```ts
 import { createForm } from '@donega/form-wrapper';
 
 const form = createForm({
-  initialValues: {
-    user: {
-      profile: { name: '', email: '' },
-      address: { street: '', number: '', city: '' },
-    },
-  },
+  initialValues: { name: '', email: '' },
+});
+
+// read / write (paths and values are type-checked)
+form.getValue('name');            // ''
+form.setValue('name', 'Gabriel');
+form.field('name').dirty;         // true — differs from the initial value
+
+// validate (optional — pass a `validator`, see below)
+await form.validate();            // true / false
+form.getError('email');           // 'E-mail inválido' | undefined
+
+// submit — validates first, then calls onSubmit
+const result = await form.submit();
+// { status: 'submitted', data } | { status: 'invalid', errors }
+// | { status: 'error', error }  | { status: 'skipped' }
+
+// reset
+form.reset();
+```
+
+With validation and submission wired in:
+
+```ts
+const form = createForm({
+  initialValues: { name: '', email: '' },
   validator: {
     validate: (values) => ({
-      valid: values.user.profile.name !== '',
-      errors: values.user.profile.name === ''
-        ? { user: { profile: { name: 'Name is required' } } }
-        : null,
+      valid: values.name !== '' && values.email.includes('@'),
+      errors:
+        values.name === '' ? { name: 'Name is required' }
+        : values.email.includes('@') ? null
+        : { email: 'Invalid e-mail' },
     }),
   },
   onSubmit: async (values) => {
-    await api.save(values); // receives the complete nested structure
+    await api.save(values); // your call — receives the nested values
+  },
+});
+```
+
+**→ Continue with [Getting Started](docs/getting-started.md)** — the same form, step by step.
+
+## Mental model
+
+The form owns state and logic. The UI layer — your app or a framework adapter — renders it:
+
+```
+Form
+ ├── values
+ ├── errors
+ ├── touched
+ ├── dirty
+ ├── validation
+ └── submission
+        ↓
+   Framework / UI
+```
+
+The core knows nothing about inputs, selects, CSS or components. Framework adapters only bridge `subscribe()` into reactivity — they add no behavior of their own.
+
+## Cheat sheet
+
+| I want to… | API |
+|---|---|
+| Read a value | `form.getValue(path)` |
+| Change a value | `form.setValue(path, value)` |
+| Read an error | `form.getError(path)` |
+| Set a server/external error | `form.setError(path, message)` / `form.setErrors(nested)` |
+| Clear errors | `form.clearError(path)` / `form.clearErrors(path?)` |
+| Mark as touched | `form.touch(path)` |
+| Validate the form | `await form.validate()` |
+| Validate one field | `await form.validateField(path)` |
+| Submit | `await form.submit()` |
+| Reset everything | `form.reset()` |
+| Reset one field | `form.resetField(path)` |
+| Work with a field's state | `form.field(path)` |
+| Work with a dynamic array | `form.array(path)` |
+| React to any change | `form.subscribe(listener)` |
+| Read all state at once | `form.state` |
+
+## Nested objects
+
+Paths are typed from `initialValues` — every dot is checked by the compiler:
+
+```ts
+const form = createForm({
+  initialValues: {
+    user: {
+      profile: { name: '', email: '' },
+      address: { street: '', city: '' },
+    },
   },
 });
 
-form.setValue('user.profile.name', 'Gabriel'); // type-checked
-form.getValue('user.address.city');
-form.touch('user.profile.name');
-await form.validateField('user.profile.name');
-await form.submit(); // { status: 'submitted' | 'invalid' | 'error' | 'skipped', ... }
+form.setValue('user.profile.name', 'Gabriel'); // ✓
+form.setValue('user.profile.nope', 'x');       // ✗ compile error
+form.setValue('user.profile.age', 30);         // ✗ string expected
 ```
+
+Errors and touched state mirror the same structure, and any path (leaf, object or array) can be validated, reset or observed.
+
+**→ [Nested forms guide](docs/nested-forms.md)**
+
+## Dynamic arrays
+
+```ts
+const users = form.array('users');
+
+users.append({ name: '', email: '' });
+users.remove(0);
+users.move(1, 0);
+
+// errors and touched entries follow their items across shifts
+users.insert(0, { name: '', email: '' });
+```
+
+Removing or reordering items **remaps** error and touched indices automatically, so messages never end up on the wrong row.
+
+**→ [Arrays guide](docs/arrays.md)**
+
+## Validation
+
+Progressive, from a hand-rolled validator to async:
+
+```ts
+// sync
+validator: { validate: (values) => ({ valid, errors }) }
+
+// async — e.g. check if the e-mail is taken
+validator: {
+  validate: async (values) => {
+    const taken = await api.emailExists(values.email);
+    return taken
+      ? { valid: false, errors: { email: 'Already in use' } }
+      : { valid: true, errors: null };
+  },
+}
+```
+
+Async validations are race-protected: if values change while a validation is in flight, the stale result is discarded — newer results always win.
+
+**→ [Validation guide](docs/validation.md)** · **→ [Zod adapter](packages/zod)**
+
+## Server errors
+
+`submit()` never throws — it returns a typed result, and your API errors map straight onto fields:
+
+```ts
+const result = await form.submit();
+if (result.status === 'error') {
+  form.setErrors({
+    email: 'This e-mail is already registered', // nested like your values
+  });
+}
+```
+
+Server errors live in their own channel with precedence over validation errors, so API messages survive the next re-validation.
+
+**→ [Server errors guide](docs/server-errors.md)**
+
+## field()
+
+`form.field(path)` gives you the state and operations of one field — value, error, touched, dirty, valid, validating — always in sync through getters:
+
+```ts
+const name = form.field('user.profile.name');
+
+name.value;      // current value
+name.error;      // string | undefined
+name.touched;    // boolean
+name.dirty;      // deep-compared against the initial value
+name.valid;      // no error at this path or under it
+name.validating; // validation in flight covering this path
+
+name.setValue('Gabriel');
+name.touch();
+await name.validate();
+name.reset();
+```
+
+**→ [API reference](docs/api.md)**
 
 ## Framework integration
 
-The core exposes a single integration hook: `subscribe(listener)`. Every mutation calls the listener synchronously and hands it the form instance; it returns an unsubscribe function. Combined with the reference-stable `form.state` snapshot, the same headless pattern works in any framework:
+The whole integration surface is `subscribe(listener)` plus the reference-stable `form.state` snapshot — the same pattern works everywhere:
 
-### React — `useSyncExternalStore`
+```ts
+// Vue (official adapter)
+import { useForm, useField } from '@donega/form-wrapper-vue';
+
+const { form, state } = useForm({ initialValues: { name: '' } });
+const name = useField(form, 'name');
+// <input v-model="name.value" />
+```
 
 ```tsx
-import { useSyncExternalStore } from 'react';
-import { createForm, type FormApi } from '@donega/form-wrapper';
-
-export function useForm<TValues extends object, TData = void>(form: FormApi<TValues, TData>) {
-  const state = useSyncExternalStore(
-    form.subscribe,          // subscribe(listener) — signature matches
-    () => form.state,        // snapshot is reference-stable between changes
-  );
-  return { state, form };
-}
+// React (no adapter needed — useSyncExternalStore fits the API)
+const state = useSyncExternalStore(form.subscribe, () => form.state);
 ```
 
-> `form.state` is cached and only rebuilt when the form changes — exactly what `useSyncExternalStore` requires. Passing a fresh object per access would cause an infinite render loop.
-
-### Vue — `ref` + `watchEffect`
-
-```ts
-import { ref, onUnmounted } from 'vue';
-import { createForm } from '@donega/form-wrapper';
-
-const form = createForm({ initialValues: { name: '' } });
-const state = ref(form.state);
-
-const unsubscribe = form.subscribe(() => {
-  state.value = form.state;
-});
-onUnmounted(unsubscribe);
-```
-
-### Svelte — writable store
-
-```ts
-import { writable } from 'svelte/store';
-import { createForm } from '@donega/form-wrapper';
-
-const form = createForm({ initialValues: { name: '' } });
+```svelte
+// Svelte
 const state = writable(form.state);
-
-form.subscribe(() => state.set(form.state)); // Svelte auto-unsubscribes
+form.subscribe(() => state.set(form.state));
 ```
 
-Official adapters (`useForm` composable/hook per framework, validators) are planned — see [Roadmap](#roadmap).
+**→ [Framework integration guide](docs/framework-integration.md)**
 
-## Public API
+## Packages
 
-### State (getters)
+| Package | Status | Description |
+|---|---|---|
+| [`@donega/form-wrapper`](#quick-start) | ✅ stable | Core — headless controller, no dependencies |
+| [`@donega/form-wrapper-vue`](packages/vue) | ✅ ready | `useForm` / `useField` composables for Vue 3 |
+| [`@donega/form-wrapper-zod`](packages/zod) | ✅ ready | Schema validation via Zod |
+| `@donega/form-wrapper-react` | 📋 planned | `useForm` hook (the core already fits `useSyncExternalStore`) |
+| `@donega/form-wrapper-valibot` | 📋 planned | Schema validation via Valibot |
 
-| Property | Description |
+## Documentation
+
+| Doc | What's inside |
 |---|---|
-| `values` | Current nested object (mutate only via the API) |
-| `initialValues` | Defensive clone of the initial values (never mutated) |
-| `errors` | Nested errors mirroring the structure of `values` |
-| `touched` | Nested touched structure |
-| `isDirty` | Any value differs from `initialValues` (deep comparison) |
-| `isValid` | No errors (validation and external) |
-| `isSubmitting` | `onSubmit` running |
-| `isValidating` | Any validation in flight |
-| `isSubmitted` | Last submit completed successfully |
-| `submitCount` | Total submit attempts |
-| `state` | Consistent snapshot of everything above (reference-stable between changes) |
+| [Getting started](docs/getting-started.md) | First form in ~2 minutes |
+| [Concepts](docs/concepts.md) | Mental model, error channels, snapshots, immutability |
+| [API reference](docs/api.md) | Every method, typed and explained |
+| [Nested forms](docs/nested-forms.md) | Deep objects and path type-safety |
+| [Arrays](docs/arrays.md) | Dynamic fields and index remapping |
+| [Validation](docs/validation.md) | Sync, async, field-level, race protection |
+| [Server errors](docs/server-errors.md) | API errors, precedence between channels |
+| [Framework integration](docs/framework-integration.md) | `subscribe()`, Vue/React/Svelte |
+| [Recipes](docs/recipes) | Login, registration, dynamic fields, async validation, multi-step |
 
-### Methods
+## Examples
 
-- **Values**: `getValue(path)`, `setValue(path, value)`
-- **Errors**: `getError(path)`, `setError(path, msg)` (external/server channel), `clearError(path)`, `clearErrors(path?)`, `setErrors(nested)` (applies API errors, replacing previous external ones)
-- **Touched**: `touch(path)`
-- **Validation**: `validate()`, `validateField(path)`
-- **Submit**: `submit()` — validates before running `onSubmit`; returns a typed discriminated result; guards against concurrent submits; `isSubmitting` is always restored
-- **Reset**: `reset()`, `resetField(path)` (works for leaf, object or array)
-- **Controllers**: `field(path)` (value, error, touched, dirty, valid, validating + methods), `array(path)` (append, prepend, insert, remove, replace, move, clear — remapping errors/touched automatically)
-- **Adapters**: `subscribe(listener)` — change notification for framework integration
+Runnable apps in [`examples/`](examples):
 
-## Path type safety
+- **[vanilla](examples/vanilla)** — plain DOM, no build step
+- **[vue](examples/vue)** — Vue 3 + Composition API + TypeScript + Vite, using the official adapter
 
-From `initialValues`, the `Path<T>`, `PathValue<T, P>` and `ArrayPath<T>` types infer valid paths and the value type at each one:
+## Roadmap
 
-```ts
-form.setValue('user.profile.name', 'Gabriel'); // ok — string
-form.setValue('age', 30);                      // ok — number
-form.setValue('age', '30');                    // ✗ type error
-form.setValue('user.nope', 1);                 // ✗ nonexistent path
-form.array('users.0.tags');                    // ok — array
-form.array('user.profile');                    // ✗ not an array
-```
+**Core**
+- ✅ Values, nested paths, dynamic arrays, validation, server errors, submission
+- ✅ Field/array controllers with automatic index remapping
+- Future: reactive validation triggers (`validateOnBlur`/`validateOnChange`) in adapters, `Set`/`Map` value support
 
-## Validators
+**Adapters**
+- ✅ Vue 3 (`@donega/form-wrapper-vue`)
+- 📋 React, Svelte
 
-The core is agnostic. Any adapter implements the interface:
+**Validators**
+- ✅ Zod (`@donega/form-wrapper-zod`)
+- 📋 Valibot
 
-```ts
-interface FormValidator<TValues> {
-  validate(values: TValues): ValidationResult<TValues> | Promise<ValidationResult<TValues>>;
-}
-
-interface ValidationResult<TValues = unknown> {
-  valid: boolean;
-  errors: FormErrors<TValues> | null; // nested structure mirroring values
-}
-```
-
-Planned adapters: `validator-zod`, `validator-valibot`, etc. A custom validator (as above) works too.
-
-## Architecture
-
-```
-core (pure TypeScript, no reactivity)
-  └── framework adapters (useForm for Vue/React via subscribe())
-        └── application UI
-```
-
-```
-src/
-  types.ts            public types (FormApi, FormValidator, SubmitOutcome…)
-  form.ts             createForm — orchestration
-  field.ts            FieldApi per path
-  array.ts            ArrayApi with index remapping
-  validation.ts       validation result application
-  paths/types.ts      Path<T>, PathValue<T, P>, ArrayPath<T>
-  paths/operations.ts getByPath, setByPath, deleteByPath, hasPath
-  pathMap.ts          path-keyed store (errors/touched) + remapIndices
-  equality.ts         deepEqual, deepClone
-```
-
-## Design decisions
-
-- **Selective immutability**: mutations create new roots with structural sharing; `initialValues` and array items are deep-cloned. The API is safe against external mutation.
-- **Two error channels**: validation errors (written only by `validate()`) and external/server errors (`setError`/`setErrors`). `getError` merges both (server takes precedence); `isValid` considers both.
-- **Validation versioning**: every value mutation invalidates in-flight validations; stale results never overwrite newer ones.
-- **`submit()` returns, doesn't throw**: `{ status: 'submitted' | 'invalid' | 'error' | 'skipped' }` — no error is silently swallowed.
-- **Reference-stable snapshots**: `state` is cached between mutations, so identity-based render systems (React's `useSyncExternalStore`) work out of the box.
-
-## Known limitations
-
-- Array indices are typed as `${number}`; numeric strings like `'0.1'` also match the pattern (e.g. `'matrix.0.1'` is accepted even if `0.1` isn't a valid index). A deliberate trade-off for type simplicity and autocomplete.
-- Array indices in errors/touched produce possibly sparse arrays in the exposed nested structure (`users.0` and `users.2` with errors → hole at `1`).
-- No automatic validation on `setValue` (validateOnChange/Blur) — left to the framework adapter, which has the UI context.
+**Tooling**
+- 📋 Documentation site, DevTools, more examples
 
 ## Development
 
 ```bash
 npm install
-npm test          # vitest run (includes type-level test typecheck)
+npm test                  # core tests (includes type-level tests)
+npm run test:packages     # adapter tests
 npm run typecheck
-npm run build
-npm run smoke     # imports the built package in plain Node
+npm run build             # core, then: npm run build:packages
+npm run smoke             # imports the built package in plain Node
 ```
-
-## Roadmap
-
-1. `@donega/form-wrapper-validator-zod` (and other validation adapters)
-2. `@donega/form-wrapper-vue` / `-react` with reactive `useForm()` via `subscribe()`
-3. Reactive validation options (`validateOnBlur`, `validateOnChange`) in the adapters
-4. `Set`/`Map` and class instance support as values
 
 ## License
 

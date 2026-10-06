@@ -96,3 +96,44 @@ describe('resetField', () => {
     expect(field.value).toBe('a');
   });
 });
+
+describe('reset edge cases', () => {
+  it('resetField restores an array path and drops errors under it', () => {
+    const form = createForm({ initialValues: { tags: ['a', 'b'] } });
+
+    form.array('tags').clear();
+    form.setError('tags.0', 'x');
+    form.touch('tags.0');
+    expect(form.getValue('tags')).toEqual([]);
+    expect(form.isValid).toBe(false);
+
+    form.resetField('tags');
+    expect(form.getValue('tags')).toEqual(['a', 'b']);
+    expect(form.getError('tags.0')).toBeUndefined();
+    expect(form.field('tags.0').touched).toBe(false);
+    expect(form.isValid).toBe(true);
+  });
+
+  it('resetField on a nested subtree clears only that subtree\'s errors', async () => {
+    const form = createForm({
+      initialValues: { user: { profile: { name: '' } }, other: '' },
+      validator: {
+        validate: (values) => ({
+          valid: values.user.profile.name !== '' && values.other !== '',
+          errors: {
+            ...(values.user.profile.name === '' ? { user: { profile: { name: 'Required' } } } : {}),
+            ...(values.other === '' ? { other: 'Required' } : {}),
+          },
+        }),
+      },
+    });
+    await form.validate();
+    expect(form.isValid).toBe(false);
+
+    form.setValue('user.profile.name', 'Gabriel');
+    form.resetField('user');
+    expect(form.getError('user.profile.name')).toBeUndefined();
+    // sibling's error is untouched by the subtree reset
+    expect(form.getError('other')).toBe('Required');
+  });
+});

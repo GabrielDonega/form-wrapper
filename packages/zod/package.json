@@ -1,0 +1,47 @@
+{
+  "name": "@donega/form-wrapper-zod",
+  "version": "0.1.0",
+  "description": "Zod adapter for @donega/form-wrapper — schema validation for the headless form controller",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@donega/form-wrapper": "file:../.."
+  },
+  "peerDependencies": {
+    "zod": "^3.24.0 || ^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9",
+    "zod": "^4.0.0"
+  },
+  "sideEffects": false,
+  "keywords": [
+    "zod",
+    "form",
+    "validation",
+    "headless"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GabrielDonega/form-wrapper.git",
+    "directory": "packages/zod"
+  },
+  "license": "MIT"
+}

@@ -113,3 +113,49 @@ describe('errors', () => {
     expect(form.errors).toEqual({ user: 'Dados inválidos' });
   });
 });
+
+describe('error channel edge cases', () => {
+  it('clearing the external channel with setErrors(null)', async () => {
+    const form = createForm({ initialValues: { name: '' } });
+    form.setErrors({ name: 'Servidor recusou' });
+    expect(form.getError('name')).toBe('Servidor recusou');
+
+    form.setErrors(null);
+    expect(form.getError('name')).toBeUndefined();
+    expect(form.isValid).toBe(true);
+  });
+
+  it('clearError removes validation errors too, not only external ones', async () => {
+    const form = createForm({
+      initialValues: { name: '', email: 'ok@mail.com' },
+      validator: {
+        validate: (values) => ({
+          valid: values.name !== '',
+          errors: values.name === '' ? { name: 'Required' } : null,
+        }),
+      },
+    });
+    await form.validate();
+    expect(form.getError('name')).toBe('Required');
+
+    form.clearError('name');
+    expect(form.getError('name')).toBeUndefined();
+    expect(form.isValid).toBe(true);
+  });
+
+  it('server errors keep precedence after a new validation writes the same path', async () => {
+    const form = createForm({
+      initialValues: { email: '' },
+      validator: {
+        validate: (values) => ({
+          valid: values.email.includes('@'),
+          errors: values.email.includes('@') ? null : { email: 'E-mail inválido' },
+        }),
+      },
+    });
+
+    form.setError('email', 'Do servidor');
+    await form.validate(); // also fails, writes a validation error
+    expect(form.getError('email')).toBe('Do servidor');
+  });
+});

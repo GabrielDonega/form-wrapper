@@ -1,6 +1,6 @@
 {
   "name": "@donega/form-wrapper",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Headless, framework-agnostic form state controller with typed nested paths",
   "type": "module",
   "main": "./dist/index.js",
@@ -16,11 +16,18 @@
     "README.md",
     "LICENSE"
   ],
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:packages": "npm test --workspaces --if-present",
+    "build:packages": "npm run build --workspaces --if-present",
     "typecheck": "tsc --noEmit",
+    "typecheck:packages": "npm run typecheck --workspaces --if-present",
     "smoke": "node scripts/smoke.mjs",
     "prepublishOnly": "npm run typecheck && npm test && npm run build && npm run smoke"
   },

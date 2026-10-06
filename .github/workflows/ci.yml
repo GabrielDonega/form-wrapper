@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  core:
+    name: Core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run smoke
+
+  packages:
+    name: ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [form-wrapper-vue, form-wrapper-zod]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build # core dist — adapter builds/tests resolve against it
+      - run: npm run typecheck --workspace @donega/${{ matrix.package }}
+      - run: npm test --workspace @donega/${{ matrix.package }}
+      - run: npm run build --workspace @donega/${{ matrix.package }}

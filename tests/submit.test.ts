@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createForm } from '../src/index.js';
+import type { FormValidator } from '../src/index.js';
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
 
 describe('submit', () => {
   const validForm = (onSubmit: (values: unknown) => unknown) =>
@@ -181,5 +190,33 @@ describe('submit', () => {
     expect(form.getError('user.profile.email')).toBe('E-mail já cadastrado');
     expect(form.isSubmitting).toBe(false);
     expect(form.values).toEqual({ user: { profile: { email: 'a@b.c' } } });
+  });
+});
+
+describe('submit with values changing during validation', () => {
+  it('retries validation instead of submitting stale values', async () => {
+    const gates = [
+      deferred<{ valid: boolean; errors: { name: string } | null }>(),
+      deferred<{ valid: boolean; errors: { name: string } | null }>(),
+    ];
+    let call = 0;
+    const validator: FormValidator<{ name: string }> = {
+      validate: () => gates[call++]!.promise,
+    };
+    const onSubmit = vi.fn(async (_values: { name: string }) => 'done');
+    const form = createForm({ initialValues: { name: 'first' }, validator, onSubmit });
+
+    const pending = form.submit();
+    // values change while the submit's validation is in flight
+    form.setValue('name', 'second');
+
+    gates[0]!.resolve({ valid: true, errors: null }); // stale pass — must be ignored
+    await Promise.resolve();
+    gates[1]!.resolve({ valid: true, errors: null }); // fresh pass — accepted
+    const result = await pending;
+
+    expect(result).toEqual({ status: 'submitted', data: 'done' });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0]![0]).toEqual({ name: 'second' });
   });
 });
